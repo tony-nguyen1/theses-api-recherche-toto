@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.*;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -126,7 +127,12 @@ public class TheseController {
     private List<String> getMailAdressesFromMovies(SignalerErreurDto json, RestTemplate restTemplate) {
         if (Arrays.asList(env.getActiveProfiles()).contains("prod") || Arrays.asList(env.getActiveProfiles()).contains("test") || Arrays.asList(env.getActiveProfiles()).contains("localhost")) {
 
-            URI uri = URI.create(env.getProperty("movies.assistance_deportee.url") + json.getEtabPpn());
+            String etabPpn = json.getEtabPpn();
+            if (etabPpn == null || !Pattern.matches("^[A-Za-z0-9_-]{1,64}$", etabPpn)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paramètre etabPpn invalide");
+            }
+
+            URI uri = URI.create(env.getProperty("movies.assistance_deportee.url") + etabPpn);
             Map<String, Object> response = restTemplate.getForObject(uri, Map.class);
             if (response == null) {
                 log.error("Movies a mal répondu ! ");
@@ -142,7 +148,7 @@ public class TheseController {
                         if (binding.get("ppnEtabCible") != null) {
                             return dbRequests.getMailAddress(binding.get("ppnEtabCible").get("value"), json.getAppSource()).stream();
                         } else {
-                            return dbRequests.getMailAddress(json.getEtabPpn(), json.getAppSource()).stream();
+                            return dbRequests.getMailAddress(etabPpn, json.getAppSource()).stream();
                         }
                     })
                     .collect(Collectors.toList());
